@@ -1,0 +1,242 @@
+$ENTRY Go {
+  = <GenRules 1 <ReadConsole>>;
+}
+
+ReadConsole {
+  = <CheckEOF <Card>>;
+}
+
+CheckEOF {
+  e.Line 0 = e.Line;
+  e.Line = e.Line '\n' <ReadConsole>;
+}
+
+FailRules {
+  = <Prout '\nFail rules:'>
+    <Prout '(>fail) char   -> char (>fail)'>
+    <Prout '(>fail) $      -> (<fail) $'>
+    <Prout 'mark (<fail)   -> (<fail)'>
+    <Prout '[ (<fail)      -> (<fail) ('>
+    <Prout '] (<fail)      -> (<fail) )'>
+    <Prout '& (<fail)      -> ^'>;
+}
+
+ParenthesesCheck {
+  = <Prout '\nCheck if the string has balanced parentheses'>
+    <Prout 'char (< p)        ->  (< p) char'>
+    <Prout '(  (< p)          ->  [ (> search)'>
+    <Prout '(> search) mark2  ->  (>fail)'>
+    <Prout '(> search)  )     ->  (< p)  ]'>
+    <Prout 'mark1 (< p)       ->  mark1  (> check)'>
+    <Prout '(> check)   (     ->  (>fail)'>
+    <Prout '(> check)   )     ->  (>fail)'>
+    <Prout '(> check)  mark2  ->  (< ok) mark2'>
+    <Prout '(> check) char    ->  char  (> check)'>
+    <Prout 'mark1 (< ok)      ->  (< p) mark1'>
+    <Prout '[ (< ok)          ->  (< ok) ('>
+    <Prout '] (< ok)          ->  (< ok) )'>
+    <Prout 'char (< ok)       ->  (< ok) char'>;
+}
+
+GenRules {
+  s.Rule e.OneRule '\n' e.Other 
+    = <GenOneRule s.Rule e.OneRule>
+      <GenRules <Add s.Rule 1> e.Other>;
+  s.Rule e.OneRule 
+    = <GenOneRule s.Rule e.OneRule>
+      <ParenthesesCheck>
+      <FailRules>;
+}
+
+GenOneRule {
+  s.Rule '^' e.P1 '$ = ^' e.P2 '$' 
+    = <Prout '\n\nRule ' s.Rule ': ^' e.P1 '$ = ^' e.P2 '$'>
+      <Generate (('V' '~') <Parse e.P1> ('V' '@'))
+      (('V' '~') <Parse e.P2> ('V' '@')) s.Rule>;
+  s.Rule e.Fault = <Prout 'Parsing Failed for rule ' s.Rule ': ' e.Fault>;
+}
+
+OneOf {
+  t.Sample e.Items-B t.Sample e.Items-E = True;
+  t.Sample e.Items = False;
+}
+
+Alphabet {
+  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+}
+
+Parse {
+  = ;
+  s.Char e.Rest, <OneOf s.Char <Alphabet>> : True = ('V' s.Char) <Parse e.Rest>;
+  s.Char e.Rest = <AddTerm s.Char <Parse e.Rest>>;
+}
+
+AddTerm {
+  s.Char = ('T' s.Char);
+  s.Char ('T' e.Term) e.Rest = ('T' s.Char e.Term) e.Rest;
+  s.Char e.Rest = ('T' s.Char) e.Rest;
+}
+
+CarriageRight {
+  s.Rule s.Mark = '(' <Symb s.Rule> '>' s.Mark ')';
+}
+
+CarriageLeft {
+  s.Rule s.Mark = '(' <Symb s.Rule> '<' s.Mark ')';
+}
+
+Generate {
+  (e.P1) (e.P2) s.Rule 
+    = <Prout 'Positioning: '>
+      <Prout '^       ->  & ' <CarriageRight s.Rule 0>>
+      <GenPositioning (e.P1) 0 s.Rule>
+    
+      <Prout '\nTurn rules for all carriage:'>
+      <GenTurnRule <Sub <GetElemCount (e.P1) 0> 1> s.Rule>
+
+      <Prout '& (< p)      ->  & ' <CarriageRight s.Rule 't'>>
+      <Prout '\nTerms deleting'>
+      <GenDeleteTerms (e.P1) (e.P2) s.Rule>
+
+      <Prout '\nTerms Inserting'>
+      <GenInsertTerms (e.P1) (e.P2) s.Rule>
+
+      <Prout ''>
+      <Prout <CarriageRight s.Rule 't'> ' $   '
+      '->  ' <CarriageLeft s.Rule 't'> ' $'>
+      <Prout <CarriageRight s.Rule 't'> ' char   '
+      '->  char ' <CarriageRight s.Rule 't'>>
+
+      <Prout '\nDelete variables:'>
+      <GenDeleteVar (e.P1) (e.P2) s.Rule>
+
+      <Prout '\nchar '<CarriageLeft s.Rule 'e'> '  '
+      '->  ' <CarriageLeft s.Rule 'e'>>
+      <Prout 'mark '<CarriageLeft s.Rule 't'> '  '
+      '->  ' <CarriageLeft s.Rule 't'>>
+      <Prout '& '<CarriageLeft s.Rule 't'> '  ->   ^'>
+      <Prout 'char '<CarriageLeft s.Rule 't'> '  '
+      '->  ' <CarriageLeft s.Rule 't'> ' char'>
+}
+
+ReverseList {
+  = ;
+  t.X e.Rest = <ReverseList e.Rest> t.X;
+}
+
+GenPositioning {
+  /* str start */
+  (('V' '~') ('T' e.T) ('V' s.V) e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> ' '
+      '->  ~1 ' <CarriageRight s.Rule <Add s.Idx 1>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 1>> ' ' e.T '   '
+      '->  ~2 ' e.T ' ' s.V '1 ' <CarriageRight s.Rule <Add s.Idx 3>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 3>> ' char  '
+      '->  char ' <CarriageRight s.Rule <Add s.Idx 3>>>
+      <GenPositioning (('V' s.V) e.Rest) <Add s.Idx 3> s.Rule>;
+
+  (('V' '~') ('V' s.V) e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> ' '
+      '->  ~1 ' <CarriageRight s.Rule <Add s.Idx 1>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 1>> ' '
+      '->  ~2 ' s.V '1 ' <CarriageRight s.Rule <Add s.Idx 2>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 2>> ' char  '
+      '->  char ' <CarriageRight s.Rule <Add s.Idx 2>>>
+      <GenPositioning (('V' s.V) e.Rest) <Add s.Idx 2> s.Rule>;
+  
+  /* pre-end */
+  (('V' s.V1) ('T' e.T) ('V' '@') e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> ' ' e.T '  '
+      ' ->  ' s.V1 '2 ' e.T ' @1 ' <CarriageRight s.Rule <Add s.Idx 2>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 2>> ' $   '
+      '->  @2 (< p) $'>;
+
+  (('V' s.V1) ('V' '@') e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> '  '
+      '->  ' s.V1 '2 @1 ' <CarriageRight s.Rule <Add s.Idx 1>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 1>> ' $   '
+      '->  @2 (< p) $'>;
+
+  /* middle */
+  (('V' s.V1) ('T' e.T) ('V' s.V2) e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> ' ' e.T '   '
+      '->  ' s.V1 '2 ' e.T ' ' s.V2 '1 ' <CarriageRight s.Rule <Add s.Idx 2>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 2>> ' char  '
+      '->  char ' <CarriageRight s.Rule <Add s.Idx 2>>>
+      <GenPositioning (('V' s.V2) e.Rest) <Add s.Idx 2> s.Rule>;
+
+  (('V' s.V1) ('V' s.V2) e.Rest) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> '  '
+      '->  ' s.V1 '2 ' s.V2 '1 ' <CarriageRight s.Rule <Add s.Idx 1>>>
+      <Prout <CarriageRight s.Rule <Add s.Idx 1>> ' char  '
+      '->  char ' <CarriageRight s.Rule <Add s.Idx 1>>>
+      <GenPositioning (('V' s.V2) e.Rest) <Add s.Idx 1> s.Rule>;
+
+  /* end */
+  (('V' '@')) s.Idx s.Rule 
+    = <Prout <CarriageRight s.Rule s.Idx> ' $   ->  @2 (< p) $'>;
+}
+
+GetElemCount {
+  () s.Count = s.Count;
+  (t.Any e.Rest) s.Count = <GetElemCount (e.Rest) <Add (s.Count) 1>>;
+}
+
+GenTurnRule {
+  1 s.Rule = ;
+  s.Num s.Rule 
+    = <Prout <CarriageRight s.Rule s.Num> ' $     ->  (<fail) $'>
+      <GenTurnRule <Sub s.Num 1> s.Rule>
+}
+
+CheckTermInRightPartAfter {
+  s.V e.T (e.Begin ('V' s.V) ('T' e.T) e.End) = True;
+  s.V e.T (e.P2) = False;
+}
+
+GenDeleteTerms {
+  () (e.P2) s.Rule = ;
+
+  (('V' s.V) ('T' e.T) e.Rest) (e.P2) s.Rule
+    , <CheckTermInRightPartAfter s.V e.T (e.P2)> : False 
+    = <Prout <CarriageRight s.Rule 't'> ' ' s.V '2 ' e.T '  '
+      '->  ' s.V '2 ' <CarriageRight s.Rule 't'>>
+      <GenDeleteTerms (('V' s.V) e.Rest) (e.P2) s.Rule>;
+
+  (t.Any e.Rest) (e.P2) s.Rule = <GenDeleteTerms (e.Rest) (e.P2) s.Rule>;
+}
+
+CheckTermInLeftPartBefore {
+  s.V e.T (e.Begin ('T' e.T) ('V' s.V) e.End) = True;
+  s.V e.T (e.P1) = False;
+}
+
+GenInsertTerms {
+  (e.P1) () s.Rule = ;
+
+  (e.P1) (('T' e.T) ('V' s.V) e.Rest) s.Rule
+    , <CheckTermInLeftPartBefore s.V e.T (e.P1)> : False 
+    = <Prout <CarriageRight s.Rule 't'> ' ' s.V '1   '
+      '->  ' e.T ' ' s.V '1 ' <CarriageRight s.Rule 't'>>
+      <GenInsertTerms (e.P1) (('V' s.V) e.Rest) s.Rule>;
+
+  (e.P1) (t.Any e.Rest) s.Rule = <GenInsertTerms (e.P1) (e.Rest) s.Rule>;
+}
+
+IsInTheLeftPart {
+  s.V (e.Begin ('V' s.V) e.End) = True;
+  s.V (e.P2) = False;
+}
+
+GenDeleteVar {
+  () (e.P2) s.Rule = ;
+  (('V' s.V) e.Rest) (e.P2) s.Rule
+    , <IsInTheLeftPart s.V (e.P2)> : False 
+    = <Prout s.V '2 ' <CarriageLeft s.Rule 't'> '  '
+      '-> ' <CarriageLeft s.Rule 'e'>>
+      <Prout s.V '1 ' <CarriageLeft s.Rule 'e'> '  '
+      '-> ' <CarriageLeft s.Rule 't'>>
+      <GenDeleteVar (e.Rest) (e.P2) s.Rule>;
+    
+  (t.Any e.Rest) (e.P2) s.Rule = <GenDeleteVar (e.Rest) (e.P2) s.Rule>;
+}
