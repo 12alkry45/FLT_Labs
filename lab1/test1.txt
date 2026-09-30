@@ -1,0 +1,4 @@
+^XYaZ$ = ^XaYZ$
+^Xa(YbZ$ = ^XaYZ$
+^abX$ = ^bcX$
+^Xabc$ = ^bc$
